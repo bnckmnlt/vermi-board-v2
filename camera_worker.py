@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from ultralytics import YOLO
 from picamera2 import Picamera2
 from libcamera import controls
-import uvicorn
+from uvicorn import Config, Server
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
@@ -162,10 +162,14 @@ class CameraProcessor:
             logging.error("Upload error: %s", e)
 
     def start_server(self):
-        if self._server_thread and self._server_thread.is_alive():
+        if getattr(self, "_server_thread", None) and self._server_thread.is_alive():
             return
+
         def _serve():
-            uvicorn.run(self.app, host=self.host, port=self.port, log_level="info", access_log=False)
+            config = Config(app=self.app, host=self.host, port=self.port, log_level="info", access_log=False)
+            self._uvicorn_server = Server(config)
+            self._uvicorn_server.run()
+
         self._server_thread = threading.Thread(target=_serve, name="camera_stream_fastapi", daemon=True)
         self._server_thread.start()
         logging.info("FastAPI server thread started.")
@@ -203,9 +207,23 @@ class CameraProcessor:
             logging.error(f"Failed to stop camera: {e}")
 
         try:
-            self._server_thread.join(timeout=2)
+            if hasattr(self, '_uvicorn_server'):
+                self._uvicorn_server.should_exit = True
+
+            if hasattr(self, '_server_thread') and self._server_thread.is_alive():
+                logging.info("Waiting for server thread to terminate...")
+                self._server_thread.join(timeout=5)
+                if self._server_thread.is_alive():
+                    logging.warning("Server thread did not terminate within timeout.")
+                else:
+                    logging.info("FastAPI server thread stopped.")
+            else:
+                logging.info("No active server thread.")
+        except Exception as e:
+            logging.error(f"Failed to stop server thread: {e}")
+
+        try:
             cv2.destroyAllWindows()
             logging.info("OpenCV windows destroyed")
         except Exception as e:
-            logging.error(f"Failed to destroy windows: {e}")
-
+            logging.error(f"Failed to destroy OpenCV windows: {e}")

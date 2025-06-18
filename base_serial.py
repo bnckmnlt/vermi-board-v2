@@ -32,9 +32,9 @@ class BaseSerialProcessor:
             logging.error(f"Serial init error on {self.port}: {e}")
 
     def start(self):
-        Thread(target=self._recv_loop,     daemon=True).start()
-        Thread(target=self._serial_loop,   daemon=True).start()
-        Thread(target=self._log_publish_loop, daemon=True).start()
+        Thread(target=self._recv_loop,        name="receive_loop", daemon=True).start()
+        Thread(target=self._serial_loop,      name="process_loop", daemon=True).start()
+        Thread(target=self._log_publish_loop, name="publish_loop", daemon=True).start()
 
     def stop(self):
         self.stop_event.set()
@@ -60,6 +60,16 @@ class BaseSerialProcessor:
                 continue
             except Exception as e:
                 logging.error(f"Serial processing error: {e}")
+
+    def send_data(self, data):
+        if self.serial_conn and self.serial_conn.is_open:
+            try:
+                self.serial_conn.write(data.encode())
+                logging.info(f"Data sent to {self.port}: {data}")
+            except serial.SerialException as e:
+                logging.error(f"Error sending data to {self.port}: {e}")
+        else:
+            logging.warning(f"Serial connection {self.port} not open or invalid.")
 
     def _log_publish_loop(self):
         last_pub = 0

@@ -118,11 +118,13 @@ class MainProgram:
             self.device_info_stop.clear()
             self.worm_info_stop.clear()
 
-            self.device_info_thread = threading.Thread(target=self.send_device_info, name="send_device_info", daemon=True)
-            self.worm_info_thread = threading.Thread(target=self.send_worm_info, name="send_worm_info", daemon=True)
+            self.mega.stop_event.clear()
             self.mega.start()
+            # self.uno.stop_event.clear()
             # self.uno.start()
 
+            self.device_info_thread = threading.Thread(target=self.send_device_info, name="send_device_info", daemon=True)
+            self.worm_info_thread = threading.Thread(target=self.send_worm_info, name="send_worm_info", daemon=True)
             self.device_info_thread.start()
             self.worm_info_thread.start()
             self._device_info_started = True
@@ -133,7 +135,7 @@ class MainProgram:
             self.worm_info_stop.set()
             
             self.mega.stop()
-            self.uno.stop()
+            # self.uno.stop()
 
             self.device_info_thread.join(timeout=2)
             self.worm_info_thread.join(timeout=2)
