@@ -40,11 +40,6 @@ class BrokerMessageProcessor:
                 "control/monitoring/thermal": self.handle_thermal_monitoring,
                 "control/monitoring/camera": self.handle_camera_inference,
             }
-        
-        for board, relays in RELAY_CONFIG.items():
-            for relay in relays:
-                topic = f"feedback/relay/{board}/{relay}"
-                self.topics[topic] = self.handle_relay_feedback
 
     def handle_fan(self, payload): self.mega.send_data(f"<Fan:{payload}>")
     def handle_aeration(self, payload): self.mega.send_data(f"<Aeration:{payload}>")
@@ -69,12 +64,6 @@ class BrokerMessageProcessor:
             logging.info(f"Feeding ID updated to {self.camera_inference.id}")
         except ValueError:
             logging.warning(f"Ignored invalid feeding ID value: {payload}")
-
-            
-    def handle_relay_feedback(self, topic, payload):
-        board, relay = map(int, topic.split("/")[-2:])
-        state = int(payload)
-        logging.info(f"Relay {relay} on board {board} updated to {state}")
         
     def handle_system_cycle(self, payload):
         try:
@@ -84,7 +73,16 @@ class BrokerMessageProcessor:
 
     def handle_system_status(self, payload):
         try:
-            self.settings.update(status=Status(payload))
+            new_status = Status(payload)
+            self.settings.update(status=new_status)
+
+            if new_status == Status.FEEDING:
+                self.uno.send_data("<Conveyor:Continuous>")
+                self.mega.send_data("<Aeration:1:Indefinite>")
+            elif new_status in {Status.ACTIVE, Status.IDLE}:
+                self.mega.send_data("<Aeration:0:Indefinite>")
+                self.uno.send_data("<Conveyor:Stop>")
+
         except ValueError:
             logging.warning(f"Ignored invalid status value: {payload}")
 

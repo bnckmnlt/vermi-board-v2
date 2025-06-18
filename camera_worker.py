@@ -14,6 +14,9 @@ from picamera2 import Picamera2
 from libcamera import controls
 from uvicorn import Config, Server
 
+from uno_serial import UnoSerialProcessor
+from system_model import Status, SystemSettings
+
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
 
@@ -28,10 +31,14 @@ class CameraProcessor:
         host="0.0.0.0",
         port=8080,
         bucket_client=None,
-        bucket_name=None
-    ):
+        bucket_name=None,
+        uno: UnoSerialProcessor = None,
+        settings: SystemSettings = None,
+    ):        
         # System Detail Vars
         self.id = 1
+        self.uno_serial = uno
+        self.settings = settings
 
         # Model & storage
         self.model = YOLO(model_path, task="detect")
@@ -93,13 +100,20 @@ class CameraProcessor:
             time.sleep(1 / 30)
 
     def _process_frame(self, frame):
+        self.current_frame = frame.copy()
+
+        if self.settings.status != Status.FEEDING:
+            return
+
         results = self.model(frame, conf=self.confidence, imgsz=320, show=False, verbose=False)
         self.current_frame = results[0].plot()
+
         h = frame.shape[0]
         y_min, y_max = h // 3, (h // 3) * 2
 
         current = set()
         detections = []
+
         for *coords, conf, cls in results[0].boxes.data.tolist():
             cy = (coords[1] + coords[3]) / 2
             name = self.model.names[int(cls)]
@@ -110,7 +124,8 @@ class CameraProcessor:
         if not self.prev_center and current:
             self.entry_info.clear()
             self._save_and_enqueue_uploads(frame, detections)
-        if self.prev_center and not current:
+
+        elif self.prev_center and not current:
             self._handle_exit(self.prev_center, self.entry_info)
 
         self.prev_center = current
@@ -127,8 +142,10 @@ class CameraProcessor:
 
     def _handle_exit(self, classes, entry_info):
         action = "EJECT" if (classes & self.invalid_classes) else "PASS"
+
         if action == "EJECT":
-            self._send_serial(action)
+            self.uno_serial.send_data("<Conveyor:Eject>")
+            
         logging.info(f"Action: {action} for {classes}")
 
         for cls, records in entry_info.items():
@@ -146,9 +163,6 @@ class CameraProcessor:
                     args=(path, payload),
                     daemon=True
                 ).start()
-
-    def _send_serial(self, cmd: str):
-        logging.info(f"Sending command: {cmd}")
 
     def send_request(self, filepath: str, payload: dict):
         try:
