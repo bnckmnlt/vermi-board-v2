@@ -120,6 +120,8 @@ class MainProgram:
 
             self.device_info_thread = threading.Thread(target=self.send_device_info, name="send_device_info", daemon=True)
             self.worm_info_thread = threading.Thread(target=self.send_worm_info, name="send_worm_info", daemon=True)
+            self.mega.start()
+            # self.uno.start()
 
             self.device_info_thread.start()
             self.worm_info_thread.start()
@@ -129,6 +131,9 @@ class MainProgram:
             logging.info(f"System is now {status.value.upper()}. Stopping info threads.")
             self.device_info_stop.set()
             self.worm_info_stop.set()
+            
+            self.mega.stop()
+            self.uno.stop()
 
             self.device_info_thread.join(timeout=2)
             self.worm_info_thread.join(timeout=2)

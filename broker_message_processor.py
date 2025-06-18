@@ -52,7 +52,7 @@ class BrokerMessageProcessor:
     def handle_sifter(self, payload): self.mega.send_data(f"<Sifter:{payload}>")
     def handle_relay(self, payload): self.mega.send_data(f"<Relay:{payload}>")
     def handle_conveyor(self, payload): self.uno.send_data(f"<Conveyor:{payload}>")
-    def handle_vermijuice(self, payload): self.uno.send_data(f"<Vermijuice:{payload}>")
+    def handle_vermijuice(self, payload): self.mega.send_data(f"<Vermijuice:{payload}>")
     def handle_rake(self, payload): self.uno.send_data(f"<Rake:{payload}>")
                 
     def on_message(self, client, userdata, message):

@@ -1,97 +1,42 @@
 import json
-from concurrent.futures import ThreadPoolExecutor
-import queue
-import threading
+import logging
+from threading import Thread
 
-try:
-    from utils import *
-    from broker_publisher import MQTTPublisherThread
-    from base_serial import BaseSerialProcessor
-    from constants import DEFAULT_LAYERS
-except ImportError:
-    logging.error("Required modules could not be imported.")
-    raise
-
+from base_serial import BaseSerialProcessor
+from broker_publisher import MQTTPublisherThread
+from constants import DEFAULT_LAYERS
+from utils import evaluate_health
 
 class MegaSerialProcessor(BaseSerialProcessor):
     def __init__(self, port, baud, mqtt_client):
-        super().__init__(port, baud)
-        self.mqtt_client = mqtt_client
-        self.mqtt_publisher = MQTTPublisherThread(mqtt_client)
-        self.mqtt_publisher.start()
+        publisher = MQTTPublisherThread(mqtt_client)
+        publisher.start()
 
-        self.log_queue = queue.Queue()
+        super().__init__(port, baud, mqtt_publisher=publisher)
 
-        # self.consumer_thread = threading.Thread(target=self.process_log_messages, name="process_log_messages", daemon=True).start()
-        
-    # [✅]
     def handle_message(self, msg):
         if msg.startswith("P"):
-            layers = self.handle_p_command(msg)
-            
-            for layer in ["bedding", "compost", "fluid"]:
-                layer_data = json.dumps(layers.get(layer, {}))
-                self.mqtt_publisher.publish(f"layer/{layer}", layer_data, qos=1)
-
-            self.evaluate_health_in_thread(layers)
-
-        elif any(msg.startswith(prefix) for prefix in ["info:", "warn", "error:", "fatal:"]):
-            self.handle_log_message(msg)
-
+            self._dispatch_payload(msg)
+        elif any(msg.startswith(pref) for pref in ("info:", "warn:", "error:", "fatal:")):
+            self._queue_log(msg)
         else:
-            self.log("error", f"Unknown command: {msg}")
-            
-    # [✅]
-    def handle_log_message(self, message):
+            self.log_async("error", f"Unknown command: {msg}")
+
+    def _dispatch_payload(self, raw):
+        payload = raw.replace("Payload:", "", 1).strip()
         try:
-            parts = message.split(":", 1)
-            log_type = parts[0]
-            content = parts[1] if len(parts) > 1 else ""
-
-            self.log(log_type, content)
-
-            self.mqtt_publisher.publish(f"system/log", message, qos=1)
-
-            # self.log_queue.put((log_type, content))
-
-            # if "Relay FB" in content:
-            #     _, board_str, pin_str, state_str = content.split(":")
-            #     board = int(board_str)
-            #     pin = int(pin_str)
-            #     state = int(state_str)
-
-            #     topic = f"feedback/relay/{board}/{pin}"
-            #     self.mqtt_publisher.publish(topic, state, qos=1, retain=True)
-
-        except Exception as e:
-            self.log("error", f"Failed to handle log message: {e}")
-    
-    # [✅]
-    def process_log_messages(self):
-        while True:
-            try:
-                log_type, content = self.log_queue.get()
-
-                self.send_request(log_type, content)
-
-                self.log_queue.task_done()
-
-            except Exception as e:
-                self.log("error", f"Failed to process log message: {e}")
-    
-    # [✅]
-    def handle_p_command(self, msg):
-        try:
-            msg = msg.replace("Payload:", "", 1).strip()
-            return json.loads(msg).get("layers", DEFAULT_LAYERS)
+            layers = json.loads(payload).get("layers", DEFAULT_LAYERS)
         except json.JSONDecodeError as e:
-            self.log("error", f"Invalid format for P command: {e}")
-            return DEFAULT_LAYERS
-        
-    # [✅]        
-    def evaluate_health_in_thread(self, layers):
+            logging.error(f"P cmd decode error: {e}")
+            layers = DEFAULT_LAYERS
+
+        for layer in ("bedding", "compost", "fluid"):
+            data = json.dumps(layers.get(layer, {}))
+            self.mqtt_publisher.publish(f"layer/{layer}", data, qos=1)
+
         health = evaluate_health(layers)
         self.mqtt_publisher.publish("system/health", json.dumps(health), qos=1)
-        
 
-    
+    def _queue_log(self, message):
+        level, _, msg = message.partition(":")
+        self.log_async(level, msg.strip())
