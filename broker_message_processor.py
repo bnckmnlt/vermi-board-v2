@@ -113,9 +113,9 @@ class BrokerMessageProcessor:
             self.camera_inference_started = False
 
     def handle_system_settings(self, payload):
-        pass
-        # try:
-        #     self.settings.update(data=json.loads(payload))
-        #     self.thermal_camera.set_refresh_rate(self.settings.worm_refresh_rate)
-        # except ValueError:
-        #     logging.warning(f"Ignored invalid status value: {payload}")
+        # pass
+        try:
+            self.settings.update(**json.loads(payload))
+            self.thermal_camera.set_refresh_rate(self.settings.worm_refresh_rate)
+        except ValueError:
+            logging.warning(f"Ignored invalid status value: {payload}")

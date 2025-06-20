@@ -29,4 +29,5 @@ CONTROL_TOPICS = [
     "system/current_cycle",
     "system/feeding/id",
     "system/status",
+    "system/settings",
 ]

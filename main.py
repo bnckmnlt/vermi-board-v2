@@ -3,7 +3,6 @@ import logging
 import os
 import threading
 from time import sleep
-from adafruit_mlx90640 import *
 from dotenv import load_dotenv
 from supabase import create_client, Client
 

@@ -10,14 +10,24 @@ class UnoSerialProcessor(BaseSerialProcessor):
         super().__init__(port, baud, mqtt_publisher=publisher)
 
     def handle_message(self, msg):
-        if msg.startswith("P"):
-            self.log_async("info", f"[Uno] <P command> {msg}")
+        msg = msg.strip()
 
-        elif any(msg.startswith(pref) for pref in ("info:", "warn:", "error:", "fatal:")):
+        if msg.startswith("C:"):
+            state = msg.split(":", 1)[1].strip()
+            self.log_async("info", f"[Uno] Conveyor state: {state}")
+            self.mqtt_publisher.publish("feedback/conveyor", "active" if state == "Active" else "inactive", qos=1, retain=True)
+
+        elif msg.startswith("R:"):
+            state = msg.split(":", 1)[1].strip()
+            self.log_async("info", f"[Uno] Rake state: {state}")
+            self.mqtt_publisher.publish("feedback/rake", "active" if state == "Active" else "inactive", qos=1, retain=True)
+
+        elif any(msg.startswith(prefix) for prefix in ("info:", "warn:", "error:", "fatal:")):
             self._queue_log(msg)
 
         else:
             self.log_async("error", f"Unknown command: {msg}")
+
 
     def _queue_log(self, message):
         level, _, content = message.partition(":")
