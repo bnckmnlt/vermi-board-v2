@@ -1,3 +1,6 @@
+import random
+
+
 MEGA_SERIAL_PORT = "/dev/ttyUSB0"
 UNO_SERIAL_PORT = "/dev/ttyACM0"
 MEGA_SERIAL_BAUD = 115200
@@ -31,3 +34,9 @@ CONTROL_TOPICS = [
     "system/status",
     "system/settings",
 ]
+
+# CAMERA SETTINGS
+CAMERA_WIDTH = 768
+CAMERA_HEIGHT = 1024
+
+RAND_COLORS = [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for j in range(10)]

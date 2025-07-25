@@ -74,15 +74,23 @@ class CameraProcessor:
             logging.warning(f"Ignored invalid feeding ID value: {new_id}")
 
     def _configure_camera(self, resolution):
-        cfg = self.picam2.create_preview_configuration(
-            main={"size": resolution, "format": "RGB888"},
-            controls={
-                "HdrMode": controls.HdrModeEnum.SingleExposure,
-                "AfMode": controls.AfModeEnum.Continuous,
-            },
-            buffer_count=4
-        )
-        self.picam2.configure(cfg)
+        self.picam2.preview_configuration.main.size = resolution
+        self.picam2.preview_configuration.main.format = "RGB888"
+        self.picam2.preview_configuration.align()
+
+        self.picam2.preview_configuration.controls = {
+            "HdrMode": controls.HdrModeEnum.SingleExposure,
+            "AfMode": controls.AfModeEnum.Continuous,
+            "AeEnable": True,
+            "AwbEnable": True,
+            "Sharpness": 1.8,
+            "Contrast": 1.4,
+            "Brightness": 0.2,
+            "Saturation": 1.3,
+            "NoiseReductionMode": 2,
+        }
+
+        self.picam2.configure("preview")
 
     def _register_routes(self):
         @self.app.get("/video_feed")
@@ -134,7 +142,7 @@ class CameraProcessor:
         ts = int(time.time() * 1000)
         for cls, coords, conf in detections:
             x1, y1, x2, y2 = map(int, coords[:4])
-            crop = frame[y1:y2, x1:x2]
+            crop = frame[y1: y2, x1: x2]
             fname = f"{cls}_{ts}.jpg"
             path = os.path.join(self.save_dir, fname)
             cv2.imwrite(path, crop)
