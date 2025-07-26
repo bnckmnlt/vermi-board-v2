@@ -35,8 +35,14 @@ CONTROL_TOPICS = [
     "system/settings",
 ]
 
-# CAMERA SETTINGS
+# CAMERA SERVICE CONFIG()
 CAMERA_WIDTH = 768
 CAMERA_HEIGHT = 1024
+RESOLUTION = (768, 1024)
+OUTPUT_DIR = "./detections"
+MODEL_PATH = '../practice_design/yolo11s_ncnn_model'
 
 RAND_COLORS = [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for j in range(10)]
+
+VALID_CLASSES = ["fruit", "vegetable", "grains"]
+INVALID_CLASSES = ["citrus", "meat", "foreign"]

@@ -1,5 +1,8 @@
-import unicodedata
+import os
 import logging
+import unicodedata
+from datetime import datetime
+from constants import INVALID_CLASSES
 from colorama import Fore, Style, init
 
 def clean_unicode(text):
@@ -82,3 +85,32 @@ class ColorFormatter(logging.Formatter):
         color = self.COLOR_MAP.get(record.levelno, "")
         record.msg = f"{color}{record.msg}{Style.RESET_ALL}"
         return super().format(record)
+
+def ensure_dir(path):
+    os.makedirs(path, exist_ok=True)
+
+def generate_filename(track_id: int, classname: str, confidence: float) -> str:
+    timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
+    return f"{classname}_{track_id}_{confidence:.2f}_{timestamp}.jpg"
+
+def expand_crop_box(x1, y1, x2, y2, frame_width, frame_height, margin=0.2):
+    box_width = x2 - x1
+    box_height = y2 - y1
+
+    expand_w = int(box_width * margin / 2)
+    expand_h = int(box_height * margin / 2)
+
+    new_x1 = max(0, x1 - expand_w)
+    new_y1 = max(0, y1 - expand_h)
+    new_x2 = min(frame_width, x2 + expand_w)
+    new_y2 = min(frame_height, y2 + expand_h)
+
+    return new_x1, new_y1, new_x2, new_y2
+
+def create_payload(id: int, cls: str, conf: float):
+    return {
+        "foodWasteScheduleId": 3,
+        "materialStatus": "valid" if cls not in INVALID_CLASSES else "invalid",
+        "confidence": conf,
+        "classname": cls
+    }

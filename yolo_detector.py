@@ -59,8 +59,8 @@ class YOLODetector:
                     Metadata(
                         track_id=track_id,
                         bbox=(x1, y1, x2, y2),
-                        cls=cls,
-                        conf=conf
+                        conf=conf,
+                        cls=cls
                     )
                 )
                 break
@@ -81,7 +81,7 @@ class YOLODetector:
         }
         
         for obj in metadata:
-            x1, y1, x2, y2 = map(int, obj.bbox)
+            x1, _, x2, _ = map(int, obj.bbox)
             center_x = (x1 + x2) / 2
             
             if center_x < region_width:
@@ -103,5 +103,5 @@ class YOLODetector:
 class Metadata:
     track_id: int
     bbox: tuple[int, int, int, int]
-    cls: str
     conf: float
+    cls: str
