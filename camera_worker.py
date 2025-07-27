@@ -15,7 +15,7 @@ from libcamera import controls
 from uvicorn import Config, Server
 
 from uno_serial import UnoSerialProcessor
-from system_model import Status, SystemSettings
+from src.services.system_model import Status, SystemSettings
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)

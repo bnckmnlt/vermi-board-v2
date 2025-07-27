@@ -1,27 +1,27 @@
 import json
 import logging
-import os
 import threading
 from time import sleep
 from dotenv import load_dotenv
-from supabase import create_client, Client
+
 
 try:
-    from constants import *
-    from broker_callback import *
-    from logger import setup_logger
-    from system_model import Status
-    from device_info import DeviceInfo
-    from system_model import SystemSettings
-    from broker_service import BrokerService
-    from uno_serial import UnoSerialProcessor
-    from mega_serial import MegaSerialProcessor
-    from camera_worker import CameraProcessor
-    from thermal_camera import ThermalCameraProcessor
-    from broker_message_processor import BrokerMessageProcessor        
+    from src.broker.broker_callback import *
+    from src.broker.broker_message_processor import BrokerMessageProcessor        
+    from src.broker.broker_service import BrokerService
+    from src.lib.constants import *
+    from src.logging.logger import setup_logger
+    from src.serials.uno_serial import UnoSerialProcessor
+    from src.serials.mega_serial import MegaSerialProcessor
+    from src.services.system_model import Status
+    from src.services.device_info import DeviceInfo
+    from src.services.system_model import SystemSettings
+    from src.services.camera_service import CameraService
+    from src.services.thermal_camera import ThermalCameraProcessor
 except ImportError:
     raise ImportError("Error: Required modules could not be imported.")
-            
+
+
 class MainProgram:
     def __init__(self):
         # --- Sensors and Devices ---
@@ -29,11 +29,6 @@ class MainProgram:
 
         # --- Sensors and Devices ---
         load_dotenv()
-    
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        
-        supabase: Client = create_client(url, key)
 
         # --- Broker Init ---
         mqtt_client_manager = BrokerService(
@@ -47,16 +42,14 @@ class MainProgram:
         # --- Serial Communication ---
         self.mega = MegaSerialProcessor(MEGA_SERIAL_PORT, MEGA_SERIAL_BAUD, self.client)
         self.uno = UnoSerialProcessor(UNO_SERIAL_PORT, UNO_SERIAL_BAUD, self.client)
-        
+
         # --- Processing Modules ---
         self.device_info = DeviceInfo()
         self.thermal_camera = ThermalCameraProcessor()
-        self.camera = CameraProcessor(
-            model_path="best_v1_ncnn_model",
-            resolution=(320, 320),
-            bucket_client=supabase,
-            bucket_name="image",
-            uno=self.uno,
+        self.camera = CameraService(
+            model_path="models/best_v1_ncnn_model",
+            resolution=(768, 1024),
+            uno_serial=self.uno,
             settings=self.settings,
         )
         
@@ -116,7 +109,6 @@ class MainProgram:
         finally:
             self.stop()
 
-
     def _handle_status_change(self, status):
         if status == Status.ACTIVE:
             logging.info("System is now ACTIVE.")
@@ -125,8 +117,11 @@ class MainProgram:
                 self.device_info_stop.clear()
                 self.worm_info_stop.clear()
 
-                self.mega.stop_event.clear()
-                self.mega.start()
+                # self.mega.stop_event.clear()
+                # self.mega.start()
+                
+                # self.uno.stop_event.clear()
+                # self.uno.start()
 
                 self.device_info_thread = threading.Thread(target=self.send_device_info, name="send_device_info", daemon=True)
                 self.worm_info_thread = threading.Thread(target=self.send_worm_info, name="send_worm_info", daemon=True)
@@ -143,7 +138,8 @@ class MainProgram:
 
                 self.device_info_stop.set()
                 self.worm_info_stop.set()
-                self.mega.stop()
+                # self.mega.stop()
+                # self.uno.stop()
 
                 if self.device_info_thread and self.device_info_thread.is_alive():
                     self.device_info_thread.join(timeout=2)
@@ -156,17 +152,17 @@ class MainProgram:
             else:
                 logging.info("Device info threads already stopped.")
 
-
     def stop(self):
         logging.info("Stopping program...")
 
+        self.camera.stop_stream()
         self.thermal_camera.stop_server()
 
         self.device_info_stop.set()
         self.worm_info_stop.set()
 
-        self.mega.stop()
-        self.uno.stop()
+        # self.mega.stop()
+        # self.uno.stop()
 
         if self.device_info_thread:
             self.device_info_thread.join(timeout=2)
@@ -179,7 +175,7 @@ class MainProgram:
         
         logging.info("Program stopped.")
 
-# --- START ---
+
 if __name__ == "__main__":
     setup_logger()
     start_sys = MainProgram()

@@ -11,10 +11,8 @@ __pychache__
 *.bak
 *.tmp
 *.DS_Store
-/best_v1_ncnn_model
-/detections
-/food_waste_ncnn_model
-/deep_sort
-best_v1_ncnn_model
-detections
-food_waste_ncnn_model
+
+# Folders
+/deep_sort/*
+/models/*
+/public/detections/*
